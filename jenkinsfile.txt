@@ -1,0 +1,95 @@
+// Jenkinsfile for a Maven Project
+
+pipeline {
+    agent any // Specifies where the pipeline will run (e.g., any available Jenkins agent)
+
+    tools {
+        // Define Maven and JDK tools if they are configured globally in Jenkins
+        // Ensure the names match your Jenkins tool configurations
+        maven 'M3' // Replace 'M3' with the name of your Maven installation in Jenkins
+        jdk 'JDK11' // Replace 'JDK11' with the name of your JDK installation in Jenkins
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // This step is often implicit for SCM-triggered builds,
+                // but explicitly checking out can be useful.
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                script {
+                    // Execute Maven build with options:
+                    // -DskipTests: Skips running tests during the build (tests are run in a separate stage)
+                    // -B: Batch mode (less verbose output)
+                    // -V: Displays Maven version for verification
+                    sh "mvn clean install -DskipTests -B"
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                script {
+                    // Run Maven tests. '-B' for batch mode.
+                    sh "mvn test -B"
+                }
+            }
+            // Optional: Publish test results if you use Surefire/Failsafe reports
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                    junit '**/target/failsafe-reports/*.xml' // For integration tests
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                script {
+                    // Package the application (e.g., creates JAR/WAR)
+                    sh "mvn package -DskipTests -B" // Ensure tests are skipped if already run or desired
+                }
+            }
+            // Optional: Archive artifacts like JAR/WAR files
+            post {
+                always {
+                    archiveArtifacts artifacts: 'target/*.jar, target/*.war', fingerprint: true
+                }
+            }
+        }
+
+        // Optional: Add deployment stages here (e.g., to Artifactory, Docker Hub, Kubernetes)
+        // stage('Deploy') {
+        //     steps {
+        //         echo 'Deploying application...'
+        //         // Example: Deploy to a server
+        //         // sh "scp target/*.jar user@your-server:/path/to/deploy"
+        //     }
+        // }
+    }
+
+    post {
+        // Actions to perform after the entire pipeline finishes
+        always {
+            echo 'Pipeline finished.'
+        }
+        success {
+            echo 'Pipeline succeeded!'
+            // Add notifications (e.g., email)
+        }
+        failure {
+            echo 'Pipeline failed!'
+            // Add notifications (e.g., email, Slack)
+        }
+        unstable {
+            echo 'Pipeline was unstable (e.g., tests failed but build passed).'
+        }
+        aborted {
+            echo 'Pipeline was aborted.'
+        }
+    }
+}
